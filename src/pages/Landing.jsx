@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useTranslation } from 'react-i18next'
 import LanguageSwitcher from '../components/LanguageSwitcher'
 import { apiUrl } from '../config/api'
+import VoiceAgent from '../components/VoiceAgent'
 
 /* ── Glow blob ── */
 const Glow = ({ color, x='50%', y='40%', w=600, h=350 }) => (
@@ -26,43 +27,77 @@ const Firefly = ({ style }) => (
 )
 
 export default function Landing() {
-  const [people,setPeople]         = useState(0)
-  const [volunteers,setVolunteers] = useState(0)
-  const [resolved,setResolved]     = useState(0)
-  const [events,setEvents]         = useState([])
-  const [activeStep,setActiveStep] = useState(0)
-  const [videoErr,setVideoErr]     = useState(false)
+  const [people, setPeople]         = useState(0)
+  const [volunteers, setVolunteers] = useState(0)
+  const [resolved, setResolved]     = useState(0)
+  const [events, setEvents]         = useState([])
+  const [activeStep, setActiveStep] = useState(0)
+  const [videoErr, setVideoErr]     = useState(false)
+  const [callActive, setCallActive] = useState(false)
+  const [callText, setCallText]     = useState('')
+  const [ivrPhone, setIvrPhone]     = useState('')
   const { t } = useTranslation()
-
-  useEffect(()=>{
-    let p=0,v=0,r=0
-    const id=setInterval(()=>{
-      p+=Math.floor(Math.random()*50); v+=Math.floor(Math.random()*3); r+=Math.floor(Math.random()*2)
-      setPeople(p); setVolunteers(v); setResolved(r)
-    },1500); return ()=>clearInterval(id)
-  },[])
-
-  useEffect(()=>{
-    const msgs=['Flood alert · Hyderabad','Food request · Mumbai','Medical emergency · Delhi','Volunteer dispatched · Bangalore','Crisis cluster · Chennai']
-    const id=setInterval(()=>setEvents(p=>[msgs[Math.floor(Math.random()*msgs.length)],...p.slice(0,4)]),2500)
-    return ()=>clearInterval(id)
-  },[])
-
-  useEffect(()=>{
-    const id=setInterval(()=>setActiveStep(s=>(s+1)%4),3000)
-    return ()=>clearInterval(id)
-  },[])
 
   const flies = Array.from({length:12},(_,i)=>({ left:`${5+(i*7.3)%88}%`, top:`${8+(i*11.7)%80}%` }))
 
-  const steps=[
-    {step:'01',titleKey:'step1_title',descKey:'step1_desc',icon:'📱',accent:'#059669'},
-    {step:'02',titleKey:'step2_title',descKey:'step2_desc',icon:'🤖',accent:'#7c3aed'},
-    {step:'03',titleKey:'step3_title',descKey:'step3_desc',icon:'📍',accent:'#d97706'},
-    {step:'04',titleKey:'step4_title',descKey:'step4_desc',icon:'🚀',accent:'#059669'},
+  useEffect(() => {
+    let p=0, v=0, r=0
+    const id = setInterval(() => {
+      p += Math.floor(Math.random()*50)
+      v += Math.floor(Math.random()*3)
+      r += Math.floor(Math.random()*2)
+      setPeople(p); setVolunteers(v); setResolved(r)
+    }, 1500)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    const msgs = ['Flood alert · Hyderabad','Food request · Mumbai','Medical emergency · Delhi','Volunteer dispatched · Bangalore','Crisis cluster · Chennai']
+    const id = setInterval(() => setEvents(p => [msgs[Math.floor(Math.random()*msgs.length)], ...p.slice(0,4)]), 2500)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    const id = setInterval(() => setActiveStep(s => (s+1)%4), 3000)
+    return () => clearInterval(id)
+  }, [])
+
+  const startIvrCall = async () => {
+    if (!ivrPhone.trim()) {
+      setCallActive(true)
+      setCallText('⚠️ Please enter your phone number first')
+      return
+    }
+    setCallActive(true)
+    setCallText('📞 Requesting call...')
+    try {
+      const res = await fetch(apiUrl('/start-call'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: ivrPhone.trim() })
+      })
+      if (res.ok) {
+        setCallText('📞 Call incoming on your phone! 👀')
+      } else {
+        const data = await res.json()
+        if (data.error?.includes('not a verified')) {
+          setCallText('⚠️ Number not verified with Twilio. Upgrade to call any number.')
+        } else {
+          setCallText(`❌ ${data.error || 'Failed to trigger call'}`)
+        }
+      }
+    } catch (err) {
+      setCallText('❌ Backend not reachable')
+    }
+  }
+
+  const steps = [
+    {step:'01', titleKey:'step1_title', descKey:'step1_desc', icon:'📱', accent:'#059669'},
+    {step:'02', titleKey:'step2_title', descKey:'step2_desc', icon:'🤖', accent:'#7c3aed'},
+    {step:'03', titleKey:'step3_title', descKey:'step3_desc', icon:'📍', accent:'#d97706'},
+    {step:'04', titleKey:'step4_title', descKey:'step4_desc', icon:'🚀', accent:'#059669'},
   ]
 
-  /* ── shared section style ── */
   const sec = (bg, pt=80) => ({
     minHeight:'100vh', display:'flex', flexDirection:'column',
     justifyContent:'center', position:'relative', overflow:'hidden', background:bg,
@@ -80,10 +115,10 @@ export default function Landing() {
         borderBottom:'1px solid rgba(0,0,0,0.08)'
       }}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-          <span style={{fontWeight:900,fontSize:'1.3rem',letterSpacing:'-0.04em',color:'#fff'}}>⚡ {t('brand')}</span>
+          <span style={{fontWeight:900,fontSize:'1.3rem',letterSpacing:'-0.04em',color:'#e6d2bc'}}>⚡ {t('brand')}</span>
           <div style={{display:'flex',alignItems:'center',gap:10}}>
-            <Link to="/get-started" style={{color:'rgba(255,255,255,0.85)',fontSize:'0.875rem',padding:'6px 14px',textDecoration:'none',fontWeight:500}}>{t('nav_login')}</Link>
-            <Link to="/get-started" style={{background:'rgba(0,0,0,0.18)',color:'#fff',fontWeight:700,fontSize:'0.875rem',padding:'9px 20px',borderRadius:10,border:'1px solid rgba(255,255,255,0.25)',textDecoration:'none'}}>
+            <Link to="/get-started" style={{color:'rgba(230,210,188,0.85)',fontSize:'0.875rem',padding:'6px 14px',textDecoration:'none',fontWeight:500}}>{t('nav_login')}</Link>
+            <Link to="/get-started" style={{background:'rgba(0,0,0,0.18)',color:'#e6d2bc',fontWeight:700,fontSize:'0.875rem',padding:'9px 20px',borderRadius:10,border:'1px solid rgba(230,210,188,0.25)',textDecoration:'none'}}>
               {t('nav_get_started')}
             </Link>
           </div>
@@ -91,24 +126,21 @@ export default function Landing() {
         <div style={{marginTop:8,display:'flex',justifyContent:'center'}}><LanguageSwitcher/></div>
       </nav>
 
-      {/* ══════════════════════════════════
-          SECTION 1 — HERO
-          bg: dark forest (video behind it)
-      ══════════════════════════════════ */}
-      <section style={{...sec('#0d1f17', 0), paddingTop:90, color:'#fff'}}>
+      {/* ── SECTION 1 — HERO ── */}
+      <section style={{...sec('#0d1f17', 0), paddingTop:90, color:'#e6d2bc'}}>
         {!videoErr ? (
-          <video autoPlay muted loop playsInline onError={()=>setVideoErr(true)}
+          <video autoPlay muted loop playsInline onError={() => setVideoErr(true)}
             style={{position:'absolute',inset:0,width:'100%',height:'100%',
               objectFit:'cover',filter:'brightness(0.28) saturate(1.3)',zIndex:0}}>
             <source src="/pulse-hero.mp4" type="video/mp4"/>
           </video>
-        ):(
+        ) : (
           <div style={{position:'absolute',inset:0,zIndex:0,
             background:'radial-gradient(ellipse 100% 70% at 50% 30%, #0d3326 0%, #060e09 100%)'}}/>
         )}
         <Glow color="rgba(110,231,183,0.12)" x="50%" y="38%" w={800} h={450}/>
         <div style={{position:'absolute',inset:0,zIndex:1,pointerEvents:'none',overflow:'hidden'}}>
-          {flies.map((p,i)=><Firefly key={i} style={p}/>)}
+          {flies.map((p,i) => <Firefly key={i} style={p}/>)}
         </div>
 
         <div style={{position:'relative',zIndex:2,maxWidth:860,margin:'0 auto',padding:'70px 32px 60px',textAlign:'center'}}>
@@ -124,7 +156,7 @@ export default function Landing() {
 
           <motion.h1 initial={{opacity:0,y:28}} animate={{opacity:1,y:0}} transition={{duration:0.7,delay:0.15}}
             style={{fontSize:'clamp(2.8rem,7vw,5.2rem)',fontWeight:900,lineHeight:1.06,
-              letterSpacing:'-0.04em',margin:'0 0 22px',color:'#fff'}}>
+              letterSpacing:'-0.04em',margin:'0 0 22px',color:'#e6d2bc'}}>
             {t('hero_title1')}<br/>
             <span style={{background:'linear-gradient(90deg,#6ee7b7,#34d399,#a7f3d0)',
               WebkitBackgroundClip:'text',WebkitTextFillColor:'transparent'}}>
@@ -133,42 +165,74 @@ export default function Landing() {
           </motion.h1>
 
           <motion.p initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.35}}
-            style={{color:'rgba(255,255,255,0.65)',fontSize:'1.1rem',lineHeight:1.75,
+            style={{color:'rgba(230,210,188,0.65)',fontSize:'1.1rem',lineHeight:1.75,
               maxWidth:560,margin:'0 auto 40px'}}>
             {t('hero_desc')}
           </motion.p>
 
+          {/* ── CTAs ── */}
           <motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.5}}
-            style={{display:'flex',gap:12,flexWrap:'wrap',justifyContent:'center'}}>
+            style={{display:'flex',gap:12,flexWrap:'wrap',justifyContent:'center',marginBottom:32}}>
             <Link to="/get-started"
-              style={{height:52,background:'#059669',color:'#fff',fontWeight:700,
+              style={{height:52,background:'#059669',color:'#e6d2bc',fontWeight:700,
                 padding:'0 32px',borderRadius:14,display:'flex',alignItems:'center',
                 textDecoration:'none',fontSize:'1rem',
                 boxShadow:'0 0 32px rgba(5,150,105,0.45)'}}>
               {t('nav_get_started')}
             </Link>
-            <button onClick={()=>document.getElementById('problem')?.scrollIntoView({behavior:'smooth'})}
-              style={{height:52,border:'1px solid rgba(255,255,255,0.18)',
-                background:'rgba(255,255,255,0.06)',color:'rgba(255,255,255,0.8)',
+            <button onClick={() => document.getElementById('how')?.scrollIntoView({behavior:'smooth'})}
+              style={{height:52,border:'1px solid rgba(230,210,188,0.18)',
+                background:'rgba(230,210,188,0.06)',color:'rgba(230,210,188,0.8)',
                 padding:'0 32px',borderRadius:14,cursor:'pointer',fontSize:'1rem',fontWeight:500}}>
               {t('how_btn')}
             </button>
           </motion.div>
+
+          {/* ── IVR phone channel ── */}
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.65}}
+            style={{display:'flex',alignItems:'center',gap:16,padding:'16px 24px',
+              background:'rgba(230,210,188,0.06)',border:'1px solid rgba(230,210,188,0.12)',
+              borderRadius:16,maxWidth:420,margin:'0 auto 24px',textAlign:'left'}}>
+            <span style={{fontSize:'2rem'}}>📞</span>
+            <div>
+              <p style={{color:'rgba(230,210,188,0.85)',fontSize:'0.875rem',fontWeight:600,margin:'0 0 2px'}}>
+                Field workers — call from any phone
+              </p>
+              <p style={{color:'#6ee7b7',fontFamily:'monospace',fontSize:'0.9rem',fontWeight:700,margin:'0 0 2px'}}>
+                +12603466138
+              </p>
+              <p style={{color:'rgba(230,210,188,0.4)',fontSize:'0.72rem',margin:0}}>
+                Hindi · Telugu · Tamil · English
+              </p>
+            </div>
+          </motion.div>
+
+          {/* ── Vapi Voice Agent ── */}
+          <motion.div initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:0.75}}
+            style={{maxWidth:320,margin:'0 auto'}}>
+            <p style={{color:'rgba(230,210,188,0.4)',fontSize:'0.7rem',letterSpacing:'0.12em',
+              textTransform:'uppercase',marginBottom:12}}>or demo via browser</p>
+            <VoiceAgent />
+          </motion.div>
+
+          {callActive && (
+            <div style={{marginTop:24,background:'rgba(0,0,0,0.4)',border:'1px solid #059669',
+              borderRadius:12,padding:'12px 20px',display:'inline-block'}}>
+              <p style={{color:'#6ee7b7',margin:0}}>{callText}</p>
+            </div>
+          )}
         </div>
 
         <motion.div animate={{y:[0,10,0]}} transition={{repeat:Infinity,duration:2.5}}
           style={{position:'absolute',bottom:28,left:'50%',transform:'translateX(-50%)',
             zIndex:2,display:'flex',flexDirection:'column',alignItems:'center',gap:4,cursor:'pointer'}}
-          onClick={()=>document.getElementById('problem')?.scrollIntoView({behavior:'smooth'})}>
-          <span style={{color:'rgba(255,255,255,0.25)',fontSize:'0.65rem',letterSpacing:'0.12em'}}>SCROLL</span>
+          onClick={() => document.getElementById('problem')?.scrollIntoView({behavior:'smooth'})}>
+          <span style={{color:'rgba(230,210,188,0.25)',fontSize:'0.65rem',letterSpacing:'0.12em'}}>SCROLL</span>
           <div style={{width:1,height:36,background:'linear-gradient(to bottom,#6ee7b7,transparent)'}}/>
         </motion.div>
       </section>
 
-      {/* ══════════════════════════════════
-          SECTION 2 — PROBLEM
-          bg: warm cream / beige
-      ══════════════════════════════════ */}
+      {/* ── SECTION 2 — PROBLEM ── */}
       <section id="problem" style={sec('#faf8f4')}>
         <Glow color="rgba(239,68,68,0.06)" x="50%" y="35%" w={700} h={380}/>
         <div style={{position:'relative',zIndex:1,maxWidth:860,margin:'0 auto',padding:'0 32px',textAlign:'center'}}>
@@ -194,11 +258,11 @@ export default function Landing() {
               {n:'78%',   l:'communicate in regional languages'},
               {n:'40%',   l:'volunteer hours wasted'},
               {n:'3.3M',  l:'NGOs with no coordination software'},
-            ].map((s,i)=>(
+            ].map((s,i) => (
               <motion.div key={i} initial={{opacity:0,scale:0.88}} whileInView={{opacity:1,scale:1}}
                 viewport={{once:true}} transition={{delay:i*0.07}}
                 style={{border:'1px solid rgba(220,38,38,0.2)',borderRadius:14,
-                  background:'#fff',padding:'14px 24px',textAlign:'center',
+                  background:'#e6d2bc',padding:'14px 24px',textAlign:'center',
                   boxShadow:'0 2px 12px rgba(0,0,0,0.06)'}}>
                 <p style={{color:'#dc2626',fontWeight:900,fontSize:'1.6rem',lineHeight:1}}>{s.n}</p>
                 <p style={{color:'#9ca3af',fontSize:'0.7rem',marginTop:4}}>{s.l}</p>
@@ -216,10 +280,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════
-          SECTION 3 — LIVE IMPACT
-          bg: soft white-green
-      ══════════════════════════════════ */}
+      {/* ── SECTION 3 — LIVE IMPACT ── */}
       <section style={sec('#f0faf5')}>
         <Glow color="rgba(5,150,105,0.07)" x="50%" y="40%" w={650} h={350}/>
         <div style={{position:'relative',zIndex:1,maxWidth:860,margin:'0 auto',padding:'0 32px'}}>
@@ -232,10 +293,9 @@ export default function Landing() {
             {t('live_impact')}
           </motion.h2>
 
-          {/* big counter card */}
           <motion.div initial={{opacity:0,y:24}} whileInView={{opacity:1,y:0}} viewport={{once:true}}
             style={{border:'1px solid rgba(5,150,105,0.18)',borderRadius:24,
-              background:'#fff',padding:'36px 40px',marginBottom:18,
+              background:'#e6d2bc',padding:'36px 40px',marginBottom:18,
               boxShadow:'0 4px 32px rgba(5,150,105,0.08)'}}>
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:8,marginBottom:32}}>
               <span style={{width:8,height:8,borderRadius:'50%',background:'#059669',
@@ -246,7 +306,7 @@ export default function Landing() {
               {[{val:people.toLocaleString(),label:t('people_reached'),c:'#059669'},
                 {val:volunteers,label:t('volunteers_deployed'),c:'#047857'},
                 {val:resolved,label:t('crises_resolved'),c:'#0284c7'}
-              ].map((x,i)=>(
+              ].map((x,i) => (
                 <div key={i}>
                   <p style={{fontSize:'3.4rem',fontWeight:900,color:x.c,lineHeight:1}}>{x.val}</p>
                   <p style={{color:'#9ca3af',fontSize:'0.8rem',marginTop:6}}>{x.label}</p>
@@ -255,12 +315,11 @@ export default function Landing() {
             </div>
           </motion.div>
 
-          {/* 3 stat cards */}
           <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(160px,1fr))',gap:14,marginBottom:18}}>
-            {[{v:'30s',l:t('stat1_label'),c:'#059669'},{v:'100%',l:t('stat2_label'),c:'#d97706'},{v:'0',l:t('stat3_label'),c:'#0284c7'}].map((s,i)=>(
+            {[{v:'30s',l:t('stat1_label'),c:'#059669'},{v:'100%',l:t('stat2_label'),c:'#d97706'},{v:'0',l:t('stat3_label'),c:'#0284c7'}].map((s,i) => (
               <motion.div key={i} initial={{opacity:0,y:16}} whileInView={{opacity:1,y:0}} viewport={{once:true}} transition={{delay:i*0.1}}
                 style={{border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,
-                  background:'#fff',padding:'26px 16px',textAlign:'center',
+                  background:'#e6d2bc',padding:'26px 16px',textAlign:'center',
                   boxShadow:'0 2px 16px rgba(0,0,0,0.05)'}}>
                 <p style={{fontSize:'2.8rem',fontWeight:900,color:s.c,lineHeight:1}}>{s.v}</p>
                 <p style={{color:'#9ca3af',fontSize:'0.78rem',marginTop:6}}>{s.l}</p>
@@ -268,14 +327,13 @@ export default function Landing() {
             ))}
           </div>
 
-          {/* live feed */}
           <motion.div initial={{opacity:0}} whileInView={{opacity:1}} viewport={{once:true}} transition={{delay:0.2}}
             style={{border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,
-              background:'#fff',padding:'22px 28px',boxShadow:'0 2px 16px rgba(0,0,0,0.04)'}}>
+              background:'#e6d2bc',padding:'22px 28px',boxShadow:'0 2px 16px rgba(0,0,0,0.04)'}}>
             <p style={{color:'#9ca3af',fontSize:'0.7rem',fontWeight:700,letterSpacing:'0.15em',
               textTransform:'uppercase',marginBottom:14}}>Live Feed</p>
             <AnimatePresence>
-              {events.map((e,i)=>(
+              {events.map((e,i) => (
                 <motion.div key={e+i} initial={{opacity:0,x:-14}} animate={{opacity:1,x:0}} exit={{opacity:0}}
                   style={{display:'flex',alignItems:'center',gap:10,padding:'9px 0',
                     borderBottom:i<events.length-1?'1px solid #f3f4f6':'none'}}>
@@ -288,10 +346,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════
-          SECTION 4 — HOW IT WORKS
-          bg: light warm grey
-      ══════════════════════════════════ */}
+      {/* ── SECTION 4 — HOW IT WORKS ── */}
       <section id="how" style={sec('#f7f5f2')}>
         <Glow color="rgba(124,58,237,0.05)" x="60%" y="30%" w={500} h={300}/>
         <div style={{position:'relative',zIndex:1,maxWidth:800,margin:'0 auto',padding:'0 32px'}}>
@@ -307,14 +362,14 @@ export default function Landing() {
             style={{color:'#9ca3af',textAlign:'center',marginBottom:36}}>{t('how_sub')}</motion.p>
 
           <div style={{display:'flex',flexDirection:'column',gap:10}}>
-            {steps.map((item,i)=>(
+            {steps.map((item,i) => (
               <motion.div key={item.step}
                 initial={{opacity:0,x:-20}} whileInView={{opacity:1,x:0}} viewport={{once:true}} transition={{delay:i*0.08}}
-                onClick={()=>setActiveStep(i)}
+                onClick={() => setActiveStep(i)}
                 style={{
                   border:`1.5px solid ${activeStep===i ? item.accent : 'rgba(0,0,0,0.08)'}`,
                   borderRadius:16,
-                  background: activeStep===i ? '#fff' : 'rgba(255,255,255,0.6)',
+                  background: activeStep===i ? '#e6d2bc' : 'rgba(230,210,188,0.6)',
                   padding:'18px 22px',cursor:'pointer',
                   transition:'all 0.3s ease',
                   boxShadow: activeStep===i ? `0 4px 24px ${item.accent}22` : '0 1px 6px rgba(0,0,0,0.04)',
@@ -322,10 +377,9 @@ export default function Landing() {
                 }}>
                 <span style={{fontSize:'1.7rem',flexShrink:0,marginTop:2}}>{item.icon}</span>
                 <div style={{flex:1,minWidth:0}}>
-                  <p style={{fontWeight:700,margin:0,
-                    color: activeStep===i ? item.accent : '#111'}}>{t(item.titleKey)}</p>
+                  <p style={{fontWeight:700,margin:0,color: activeStep===i ? item.accent : '#111'}}>{t(item.titleKey)}</p>
                   <AnimatePresence>
-                    {activeStep===i&&(
+                    {activeStep===i && (
                       <motion.p initial={{opacity:0,height:0}} animate={{opacity:1,height:'auto'}} exit={{opacity:0,height:0}}
                         style={{color:'#6b7280',fontSize:'0.875rem',margin:'6px 0 0',lineHeight:1.65}}>
                         {t(item.descKey)}
@@ -339,8 +393,8 @@ export default function Landing() {
           </div>
 
           <div style={{display:'flex',justifyContent:'center',gap:8,marginTop:24}}>
-            {steps.map((_,i)=>(
-              <button key={i} onClick={()=>setActiveStep(i)} style={{
+            {steps.map((_,i) => (
+              <button key={i} onClick={() => setActiveStep(i)} style={{
                 width:activeStep===i?28:8, height:8, borderRadius:999,
                 background:activeStep===i?'#059669':'rgba(0,0,0,0.15)',
                 border:'none',cursor:'pointer',transition:'all 0.3s ease'
@@ -350,11 +404,8 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════
-          SECTION 5 — WHY PULSE
-          bg: white
-      ══════════════════════════════════ */}
-      <section style={sec('#ffffff')}>
+      {/* ── SECTION 5 — WHY PULSE ── */}
+      <section style={sec('#e6d2bc')}>
         <Glow color="rgba(5,150,105,0.05)" x="30%" y="50%" w={500} h={350}/>
         <div style={{position:'relative',zIndex:1,maxWidth:1000,margin:'0 auto',padding:'0 32px'}}>
           <motion.p initial={{opacity:0}} whileInView={{opacity:1}} viewport={{once:true}}
@@ -371,12 +422,14 @@ export default function Landing() {
               {titleKey:'why1_title',descKey:'why1_desc',icon:'🧠',accent:'#059669',border:'rgba(5,150,105,0.18)'},
               {titleKey:'why2_title',descKey:'why2_desc',icon:'🗣️',accent:'#d97706',border:'rgba(217,119,6,0.18)'},
               {titleKey:'why3_title',descKey:'why3_desc',icon:'⚡',accent:'#0284c7',border:'rgba(2,132,199,0.18)'},
-            ].map((item,i)=>(
+              {titleKey:'VOICE AGENT',descKey:'for native users, for ease of use to villagers',icon:'🎙️',accent:'#be123c',border:'rgba(190,18,60,0.18)'},
+              {titleKey:'LIVE TRACKING',descKey:'track your volunteer live',icon:'📍',accent:'#7c3aed',border:'rgba(124,58,237,0.18)'},
+            ].map((item,i) => (
               <motion.div key={i}
                 initial={{opacity:0,y:24}} whileInView={{opacity:1,y:0}} viewport={{once:true}} transition={{delay:i*0.1}}
                 whileHover={{y:-5,boxShadow:`0 8px 32px ${item.accent}18`}}
                 style={{border:`1px solid ${item.border}`,borderRadius:22,
-                  background:'#fff',padding:'32px 28px',cursor:'pointer',
+                  background:'#e6d2bc',padding:'32px 28px',cursor:'pointer',
                   boxShadow:'0 2px 16px rgba(0,0,0,0.05)',transition:'all 0.35s ease'}}>
                 <span style={{fontSize:'2.2rem',display:'block',marginBottom:16}}>{item.icon}</span>
                 <p style={{fontWeight:700,color:'#111',marginBottom:10,fontSize:'1rem'}}>{t(item.titleKey)}</p>
@@ -387,11 +440,8 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ══════════════════════════════════
-          SECTION 6 — CTA + FOOTER
-          bg: deep emerald (dark but intentional)
-      ══════════════════════════════════ */}
-      <section style={{...sec('#052e1c'), color:'#fff'}}>
+      {/* ── SECTION 6 — CTA + FOOTER ── */}
+      <section style={{...sec('#052e1c'), color:'#e6d2bc'}}>
         <Glow color="rgba(110,231,183,0.12)" x="50%" y="40%" w={700} h={400}/>
         <div style={{position:'relative',zIndex:1,maxWidth:800,margin:'0 auto',
           padding:'0 32px 40px',textAlign:'center'}}>
@@ -400,11 +450,11 @@ export default function Landing() {
               textTransform:'uppercase',marginBottom:12}}>Join the Mission</motion.p>
           <motion.h2 initial={{opacity:0,y:24}} whileInView={{opacity:1,y:0}} viewport={{once:true}}
             style={{fontSize:'clamp(2rem,5vw,3.4rem)',fontWeight:900,letterSpacing:'-0.03em',
-              lineHeight:1.1,marginBottom:16,color:'#fff'}}>
+              lineHeight:1.1,marginBottom:16,color:'#e6d2bc'}}>
             {t('cta_title')}
           </motion.h2>
           <motion.p initial={{opacity:0}} whileInView={{opacity:1}} viewport={{once:true}} transition={{delay:0.12}}
-            style={{color:'rgba(255,255,255,0.6)',fontSize:'1.05rem',maxWidth:520,
+            style={{color:'rgba(230,210,188,0.6)',fontSize:'1.05rem',maxWidth:520,
               margin:'0 auto 40px',lineHeight:1.75}}>
             {t('cta_sub')}
           </motion.p>
@@ -417,8 +467,8 @@ export default function Landing() {
               {t('cta_btn1')}
             </Link>
             <Link to="/get-started"
-              style={{border:'1px solid rgba(255,255,255,0.2)',background:'rgba(255,255,255,0.06)',
-                color:'rgba(255,255,255,0.8)',padding:'15px 38px',borderRadius:14,
+              style={{border:'1px solid rgba(230,210,188,0.2)',background:'rgba(230,210,188,0.06)',
+                color:'rgba(230,210,188,0.8)',padding:'15px 38px',borderRadius:14,
                 textDecoration:'none',fontSize:'1rem'}}>
               {t('cta_btn2')}
             </Link>
@@ -426,7 +476,7 @@ export default function Landing() {
 
           <motion.div initial={{opacity:0}} whileInView={{opacity:1}} viewport={{once:true}} transition={{delay:0.32}}
             style={{display:'flex',flexWrap:'wrap',justifyContent:'center',gap:10,marginBottom:56}}>
-            {['SDG 11.5 · Disaster Response','SDG 1.5 · Climate Resilience','SDG 3.8 · Healthcare Access'].map((b,i)=>(
+            {['SDG 11.5 · Disaster Response','SDG 1.5 · Climate Resilience','SDG 3.8 · Healthcare Access'].map((b,i) => (
               <span key={i} style={{fontSize:'0.68rem',fontWeight:700,letterSpacing:'0.05em',
                 padding:'5px 14px',borderRadius:999,
                 border:'1px solid rgba(110,231,183,0.3)',color:'#6ee7b7',
@@ -436,8 +486,8 @@ export default function Landing() {
             ))}
           </motion.div>
 
-          <div style={{borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:24}}>
-            <p style={{color:'rgba(255,255,255,0.25)',fontSize:'0.82rem'}}>{t('footer')}</p>
+          <div style={{borderTop:'1px solid rgba(230,210,188,0.08)',paddingTop:24}}>
+            <p style={{color:'rgba(230,210,188,0.25)',fontSize:'0.82rem'}}>{t('footer')}</p>
           </div>
         </div>
       </section>
